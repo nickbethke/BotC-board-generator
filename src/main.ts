@@ -2,25 +2,33 @@ import Board from "./generator/board";
 import {RandomBoardInterface} from "./generator/boardGenerator";
 import Viewer from "./viewer/Viewer";
 
+// DONE: wall generation -> holes!
+// TODO: walls between rivers?
+/* DONE: Pathfinding: von allen Startfeldern zu einem, und von dem zu allen Checkpoints einmal -> nicht mehr exponentieller Wachstum */
+
 const _startValues: RandomBoardInterface = {
-    checkpoints: 2,
+    width: 16,
     height: 9,
-    lembasFields: 5,
+    startFields: 6,
+    checkpoints: 6,
+    holes: 8,
+    lembasFields: 16,
     maxLembasAmountOnField: 3,
     lembasAmountExactMaximum: false,
     rivers: true,
-    startFields: 6,
-    width: 16,
-    holes: 8,
     walls: true,
     riverAlgorithm: "complex"
 };
 
+process.stdout.write(" DAVID:RUN " + `\n`);
 const generator = Board.generateRandom(_startValues, null, true);
 const viewer = new Viewer(generator);
 viewer.draw("board-david");
 
-const generator_ = Board.generateRandom({..._startValues, riverAlgorithm: "default"});
+process.stdout.write(" NICK:RUN " + `\n`);
+const generator_ = Board.generateRandom(_startValues);
 const viewer_ = new Viewer(generator_);
 viewer_.draw("board-nick");
+
+
 process.stdout.write("\x07");

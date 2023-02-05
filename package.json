@@ -1,6 +1,6 @@
 {
   "scripts": {
-    "test": "tsc && jest dist/test.js",
+    "test": "tsc && jest --silent dist/test.js",
     "test:runtime": "tsc && node dist/runTime.js",
     "start": "npm run test && tsc && node dist/main.js",
     "start:no-test": "tsc && node dist/main.js"

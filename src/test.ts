@@ -10,6 +10,7 @@ import Checkpoint from "./generator/fields/checkpoint";
 import River from "./generator/fields/river";
 import JSONValidation from "./JSONValidation";
 import AStar from "./generator/helper/AStar";
+import Hole from "./generator/fields/hole";
 
 const _startValues: RandomBoardInterface = {
     checkpoints: 2,
@@ -146,12 +147,13 @@ describe("a-star", () => {
             {x: 0, y: 1},
             {x: 2, y: 0}
         ]
-        expect(AStar.pathPossible(checkpoints, startFields, board, walls)).toBe(true);
+        const {result} = AStar.pathPossible(checkpoints, startFields, board, walls);
+        expect(result).toBe(true);
     });
     test("a-star algorithm", () => {
         const board: Array<Array<FieldWithPositionInterface>> = [
             [
-                new Grass({x: 0, y: 0}),
+                new Hole({x: 0, y: 0}),
                 new SauronsEye({x: 1, y: 0}, DirectionEnum.NORTH),
                 new StartField({x: 2, y: 0}, DirectionEnum.NORTH),
 
@@ -167,40 +169,7 @@ describe("a-star", () => {
             ]
         ]
 
-        const walls: Array<[[number, number], [number, number]]> = [
-            [
-                [0, 2],
-                [1, 2]
-            ],
-            [
-                [2, 2],
-                [1, 2]
-            ],
-            [
-                [0, 1],
-                [0, 2]
-            ],
-            [
-                [2, 1],
-                [2, 2]
-            ],
-            [
-                [0, 0],
-                [1, 0]
-            ],
-            [
-                [0, 0],
-                [0, 1]
-            ],
-            [
-                [1, 0],
-                [1, 1]
-            ],
-            [
-                [1, 0],
-                [2, 0]
-            ]
-        ]
+        const walls: Array<[[number, number], [number, number]]> = []
         const checkpoints = [
             {x: 1, y: 1},
             {x: 1, y: 2}
@@ -209,7 +178,8 @@ describe("a-star", () => {
             {x: 0, y: 1},
             {x: 2, y: 0}
         ]
-        expect(AStar.pathPossible(checkpoints, startFields, board, walls)).toBe(true);
+        const {result} = AStar.pathPossible(checkpoints, startFields, board, walls);
+        expect(result).toBe(true);
 
     })
 })

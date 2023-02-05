@@ -53,6 +53,7 @@ export type BoardPosition = {
 }
 
 class BoardGenerator {
+    private readonly _percentage: number = 0.2;
     private readonly _board: Array<Array<FieldWithPositionInterface>>;
     private readonly _startValues: RandomBoardInterface;
     private readonly _json: Board;
@@ -83,44 +84,55 @@ class BoardGenerator {
             throw new Error("Board to small for all fields");
         }
 
-        if (this.getFieldCount() > 2 ** 10 && this._startValues.walls) {
-            // this._startValues.walls = false;
-            // console.log(`! Walls generation has been disabled due to large board size (` + this._startValues.width + "x" + this._startValues.height + `)`);
-        }
-
+        process.stdout.write(`\tGENERATING:BOARD_ARRAY\r`);
         this._board = this.generateBoardArray();
+        process.stdout.write(`\tGENERATING:BOARD_ARRAY ✔️\n`);
         this._walls = [];
 
         this._json = new Board(this._startValues.name, this._startValues.width, this._startValues.height);
 
         if (this._startValues.rivers && this.getFreeFieldsCount()) {
+            process.stdout.write(`\tGENERATING:RIVERS\r`);
             this.genRivers();
+            process.stdout.write(`\tGENERATING:RIVERS ✔️\n`);
         }
 
+        process.stdout.write(`\tGENERATING:SAURONS_EYE\r`)
         this.genSauronsEye();
+        process.stdout.write(`\tGENERATING:SAURONS_EYE ✔️\n`);
 
+        process.stdout.write(`\tGENERATING:START_FIELDS\r`)
         this.genStartFields();
+        process.stdout.write(`\tGENERATING:START_FIELDS ✔️\n`);
 
+        process.stdout.write(`\tGENERATING:CHECKPOINTS\r`)
         this.genCheckpoints();
+        process.stdout.write(`\tGENERATING:CHECKPOINTS ✔️\n`);
 
         if (this._startValues.holes) {
+            process.stdout.write(`\tGENERATING:HOLES\r`)
             this.genHoles();
+            process.stdout.write(`\tGENERATING:HOLES ✔️\n`);
         }
 
         if (this._startValues.lembasFields) {
+            process.stdout.write(`\tGENERATING:LEMBAS_FIELDS\r`)
             this.genLembasFields();
+            process.stdout.write(`\tGENERATING:LEMBAS_FIELDS ✔️\n`);
         }
 
 
         if (this._startValues.walls) {
+            process.stdout.write(`\tGENERATING:WALLS\n`)
             if (wallAlgo) {
                 this.genWalls_David();
             } else {
                 this.genWalls();
             }
+            process.stdout.write(`\tGENERATING:WALLS ✔️\n`);
 
         }
-
+        process.stdout.write(`\tGENERATING:DONE ✔️\n`);
         if (_callback) _callback();
 
     }
@@ -201,7 +213,7 @@ class BoardGenerator {
     private genRivers() {
 
         const freeSpacesCount = this.getFreeFieldsCount();
-        const max = Math.floor(freeSpacesCount / 3);
+        const max = Math.floor(freeSpacesCount / 4);
         let riverFieldCount = max <= 1 ? 1 : this.getRandomIntInclusive(1, max);
 
         // on max=1, riverFieldCount could be bigger than 1
@@ -325,8 +337,9 @@ class BoardGenerator {
     private genWalls() {
         const x = this._startValues.width;
         const y = this._startValues.height;
-        const max = (((x - 1) * y) + ((y - 1) * x)) / 4;
-        const wallsToSet = this.getRandomIntInclusive(1, max);
+        //const max = (((x - 1) * y) + ((y - 1) * x)) / 4;
+        //const wallsToSet = this.getRandomIntInclusive(1, max);
+        const wallsToSet = Math.floor((((x - 1) * y) + ((y - 1) * x)) * this._percentage);
         //console.log("MAX WALLS", max, "TO BE SET", wallsToSet);
         const alreadyTried: Array<string> = []
 
@@ -334,47 +347,52 @@ class BoardGenerator {
         this._wallMaxCall = this._wallMaxCall > 1024 ? 1024 : this._wallMaxCall;
         this._wallCall = 0;
         if (wallsToSet)
-            this.genWall(wallsToSet, 0, alreadyTried);
-
+            this.genWall(wallsToSet, 0, alreadyTried, 0);
     }
 
-    private genWall(until: number, current: number, alreadyTried: Array<string>) {
+    private genWall(until: number, current: number, alreadyTried: Array<string>, pathFindings = 0) {
         if (this._wallCall < this._wallMaxCall) {
-
             this._wallCall++;
             const firstPosition = this.getRandomPosition(true);
             const neighbors = this.getNeighbors(firstPosition);
             if (neighbors.length) {
                 const secondPosition = neighbors[this.getRandomInt(0, neighbors.length)]
-                //console.log(" > WALL TRY ", firstPosition, secondPosition, "\r");
+                process.stdout.write("\t\t WALL:TRY " + (current + 1) + `/` + until + " (PATHFINDINGS: " + pathFindings + ")" + `\r`);
                 if (!alreadyTried.includes(firstPosition.x.toString() + firstPosition.y.toString() + secondPosition.x.toString() + secondPosition.y) && !alreadyTried.includes(secondPosition.x.toString() + secondPosition.y.toString() + firstPosition.x.toString() + firstPosition.y)) {
                     const wallsCopy = [...this._walls];
                     this._walls.push([[firstPosition.x, firstPosition.y], [secondPosition.x, secondPosition.y]])
-                    const pathPossible = AStar.pathPossible(this._checkpoints, this._startFields, this._board, this._walls);
+                    const {
+                        result,
+                        pathFindings: p
+                    } = AStar.pathPossible(this._checkpoints, this._startFields, this._board, this._walls);
+                    pathFindings += p;
 
                     alreadyTried.push(firstPosition.x.toString() + firstPosition.y.toString() + secondPosition.x.toString() + secondPosition.y);
                     alreadyTried.push(secondPosition.x.toString() + secondPosition.y.toString() + firstPosition.x.toString() + firstPosition.y);
                     //console.log(alreadyTried);
-                    if (pathPossible) {
+                    if (result) {
                         current++;
                         this._json.addWall([[firstPosition.x, firstPosition.y], [secondPosition.x, secondPosition.y]]);
                         //console.log(" > New Wall", [[firstPosition.x, firstPosition.y], [secondPosition.x, secondPosition.y]], "\r");
                         if (current < until) {
-                            this.genWall(until, current, alreadyTried);
+                            this.genWall(until, current, alreadyTried, pathFindings);
                         }
 
                     } else {
                         this._walls = wallsCopy;
                         // console.log(" > ERROR Wall");
                         if (current < until) {
-                            this.genWall(until, current, alreadyTried);
+                            this.genWall(until, current, alreadyTried, pathFindings);
                         }
                     }
                 } else if (current < until) {
-                    this.genWall(until, current, alreadyTried);
+                    this.genWall(until, current, alreadyTried, pathFindings);
                 }
+
             }
         }
+        if (current == until)
+            process.stdout.write("\t\t WALL:TRY " + until + `/` + until + " (PATHFINDINGS: " + pathFindings + ")" + `\n`);
     }
 
 
@@ -409,26 +427,35 @@ class BoardGenerator {
     }
 
     private genWalls_David(): void {
+        let runs = 0;
+        let pathFindings = 0;
         for (let y = 0; y < this._board.length; y++) {
             const row = this._board[y];
             for (let x = 0; x < row.length; x++) {
                 const field = row[x];
-                this.genWall_David(field.position);
+                process.stdout.write("\t\t WALL:RUN " + (runs + 1) + `/` + this.getFieldCount() + " (PATHFINDINGS: " + pathFindings + ")" + `\r`);
+                pathFindings = this.genWall_David(field.position, pathFindings);
+                runs++;
 
             }
         }
+        process.stdout.write("\t\t WALL:RUN " + this.getFieldCount() + `/` + this.getFieldCount() + " (PATHFINDINGS: " + pathFindings + ")" + `\n`);
     }
 
-    private genWall_David(position: BoardPosition): void {
+    private genWall_David(position: BoardPosition, pathFindings: number): number {
 
         const neighbors = this.getNeighbors_David(position);
         //console.log("CURRENT FIELD", position, "NEIGHBORS", neighbors)
         for (const neighborsKey in neighbors) {
-            if (BoardGenerator.probably(20)) {
+            if (BoardGenerator.probably((this._percentage * 100))) {
                 const neighbor = neighbors[neighborsKey];
                 const wallsCopy = [...this._walls];
                 this._walls.push([[position.x, position.y], [neighbor.x, neighbor.y]])
-                const pathPossible = AStar.pathPossible(this._checkpoints, this._startFields, this._board, this._walls);
+                const {
+                    result: pathPossible,
+                    pathFindings: p
+                } = AStar.pathPossible(this._checkpoints, this._startFields, this._board, this._walls);
+                pathFindings += p;
                 if (!pathPossible) {
                     // console.log(" > WALL ERROR", position, neighbor);
                     this._walls = wallsCopy;
@@ -438,6 +465,7 @@ class BoardGenerator {
                 }
             }
         }
+        return pathFindings;
 
 
     }

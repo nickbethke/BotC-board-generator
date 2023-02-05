@@ -1,6 +1,8 @@
 import FieldWithPositionInterface from "../../interfaces/fieldWithPositionInterface";
 import SauronsEye from "../fields/sauronsEye";
 import {BoardPosition} from "../boardGenerator";
+import Hole from "../fields/hole";
+import River from "../fields/river";
 
 
 export type AStarElement = {
@@ -15,12 +17,22 @@ class AStar {
     private readonly _board: Array<Array<FieldWithPositionInterface>>;
 
     private readonly _walls: Array<[[number, number], [number, number]]>;
+    private _wallsStrings: string[];
 
     constructor(start: BoardPosition, goal: BoardPosition, board: Array<Array<FieldWithPositionInterface>>, walls: Array<[[number, number], [number, number]]>) {
         this._start = start
         this._goal = goal;
         this._board = board;
         this._walls = walls;
+
+        this._wallsStrings = [];
+
+        for (const wallsKey in this._walls) {
+            const w = this._walls[wallsKey];
+
+            const wallString = w[0].join("") + w[1].join("");
+            this._wallsStrings.push(wallString);
+        }
     }
 
     AStar(): Array<{ state: { x: number, y: number }, cost: number, estimate: number }> {
@@ -150,32 +162,24 @@ class AStar {
 
     isObstacle(x, y) {
         //console.log(" > SAURON?", this._board[y][x]);
-        return this._board[y][x] instanceof SauronsEye;
+        return (this._board[y][x] instanceof SauronsEye) || (this._board[y][x] instanceof Hole);
     }
 
     isWallBetween(position1: BoardPosition, position2: BoardPosition) {
+
         const _x1 = position1.x;
         const _x2 = position2.x;
         const _y1 = position1.y;
         const _y2 = position2.y;
-        let wall = false;
-        for (const wallsKey in this._walls) {
-            const w = this._walls[wallsKey];
 
-            const wallString1 = w[0].join("") + w[1].join("");
-            const wallString2 = w[1].join("") + w[0].join("");
+        const positionString1 = _x1.toString() + _y1.toString() + _x2.toString() + _y2.toString()
+        const positionString2 = _x2.toString() + _y2.toString() + _x1.toString() + _y1.toString()
 
-            const positionString = _x1.toString() + _y1.toString() + _x2.toString() + _y2.toString()
-
-            if (positionString == wallString1 || positionString == wallString2) {
-                wall = true;
-            }
-            if (wall) {
-                break;
-            }
+        if (this._wallsStrings.includes(positionString1)) {
+            return true;
+        } else if (this._wallsStrings.includes(positionString2)) {
+            return true;
         }
-        //console.log(" > WALL?", position1, position2, wall);
-        return wall;
     }
 
     pathIntersectsObstacle(start: BoardPosition, end: BoardPosition) {
@@ -188,15 +192,15 @@ class AStar {
 
         //get the points in the array that are within the list of obstacles
 
-        let instersections = 0;
+        let insterSections = 0;
 
         for (const pathKey in path) {
             const point = path[pathKey];
-            if (!(this._board[point[1]][point[0]] instanceof SauronsEye)) {
-                instersections++;
+            if (!(this._board[point[1]][point[0]] instanceof SauronsEye) || !(this._board[point[1]][point[0]] instanceof River)) {
+                insterSections++;
             }
         }
-        return instersections
+        return insterSections
     }
 
     getPath(startX: number, startY: number, endX: number, endY: number) {
@@ -246,19 +250,32 @@ class AStar {
         return path;
     }
 
-    static pathPossible(checkpoints, startFields, board, walls) {
-        for (const startFieldsKey in startFields) {
-            const startField = startFields[startFieldsKey];
-            for (const checkpointsKey in checkpoints) {
-                const checkpoint = checkpoints[checkpointsKey];
-                const aStar = new AStar(checkpoint, startField, board, walls);
-                const path = aStar.AStar();
-                if (path.length < 1) {
-                    return false;
-                }
+    static pathPossible(checkpoints: Array<BoardPosition>, startFields: Array<BoardPosition>, board, walls): { result: boolean, pathFindings: number } {
+        let pathFindings = 0;
+        const startFieldLength = startFields.length;
+
+        const commonStartField: BoardPosition = startFields[0];
+
+        for (let i = 1; i < startFieldLength; i++) {
+            const currStartField = startFields[i];
+            const aStar = new AStar(commonStartField, currStartField, board, walls);
+            const path = aStar.AStar();
+            pathFindings++;
+            if (path.length < 1) {
+                return {result: false, pathFindings};
             }
         }
-        return true;
+
+        for (const checkpointsKey in checkpoints) {
+            const checkpoint = checkpoints[checkpointsKey];
+            const aStar = new AStar(checkpoint, commonStartField, board, walls);
+            const path = aStar.AStar();
+            pathFindings++;
+            if (path.length < 1) {
+                return {result: false, pathFindings};
+            }
+        }
+        return {result: true, pathFindings};
     }
 
 }

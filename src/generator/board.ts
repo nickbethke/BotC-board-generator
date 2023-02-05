@@ -90,8 +90,12 @@ class Board implements BoardConfigInterface {
         this.walls.push(position);
     }
 
-    static generateRandom(startValues?: RandomBoardInterface): BoardGenerator {
-        return new BoardGenerator(startValues);
+    public getWallCount(): number {
+        return this.walls.length;
+    }
+
+    static generateRandom(startValues?: RandomBoardInterface, _callback?: () => void, wallAlgo = false): BoardGenerator {
+        return new BoardGenerator(startValues, _callback, wallAlgo);
     }
 }
 

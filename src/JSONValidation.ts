@@ -3,9 +3,9 @@ import BoardConfigInterface from "./interfaces/boardConfigInterface";
 import * as BoardConfigSchema from './boardConfigSchema.json';
 
 class JSONValidation {
-    private readonly _json: JSON;
+    private readonly _json: BoardConfigInterface;
 
-    constructor(json: JSON) {
+    constructor(json: BoardConfigInterface) {
         this._json = json;
     }
 

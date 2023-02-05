@@ -1,5 +1,5 @@
 import Grass from "./fields/grass";
-import {DirectionEnum} from "../interfaces/boardConfigInterface";
+import BoardConfigInterface, {Direction, DirectionEnum} from "../interfaces/boardConfigInterface";
 import SauronsEye from "./fields/sauronsEye";
 import StartField from "./fields/startField";
 import Checkpoint from "./fields/checkpoint";
@@ -8,7 +8,7 @@ import Lembas from "./fields/lembas";
 import River from "./fields/river";
 import Board from "./board";
 import FieldWithPositionInterface from "../interfaces/fieldWithPositionInterface";
-import PathFinder from "./helper/pathFinder";
+import AStar from "./helper/AStar";
 
 const DirectionArrows: string[] = [
     '↑', '→', '↓', '←'
@@ -66,8 +66,10 @@ class BoardGenerator {
     /**
      * @throws {Error}
      * @param startValues
+     * @param _callback
+     * @param wallAlgo
      */
-    constructor(startValues?: RandomBoardInterface) {
+    constructor(startValues?: RandomBoardInterface, _callback?: () => void, wallAlgo = false) {
 
         // TODO: start values validation...?!
 
@@ -82,14 +84,18 @@ class BoardGenerator {
         }
 
         if (this.getFieldCount() > 2 ** 10 && this._startValues.walls) {
-            this._startValues.walls = false;
-            console.log(`! Walls generation has been disabled due to large board size (` + this._startValues.width + "x" + this._startValues.height + `)`);
+            // this._startValues.walls = false;
+            // console.log(`! Walls generation has been disabled due to large board size (` + this._startValues.width + "x" + this._startValues.height + `)`);
         }
 
         this._board = this.generateBoardArray();
         this._walls = [];
 
         this._json = new Board(this._startValues.name, this._startValues.width, this._startValues.height);
+
+        if (this._startValues.rivers && this.getFreeFieldsCount()) {
+            this.genRivers();
+        }
 
         this.genSauronsEye();
 
@@ -105,13 +111,17 @@ class BoardGenerator {
             this.genLembasFields();
         }
 
-        if (this._startValues.rivers && this.getFreeFieldsCount()) {
-            this.genRivers();
-        }
 
         if (this._startValues.walls) {
-            this.genWalls();
+            if (wallAlgo) {
+                this.genWalls_David();
+            } else {
+                this.genWalls();
+            }
+
         }
+
+        if (_callback) _callback();
 
     }
 
@@ -203,7 +213,7 @@ class BoardGenerator {
             this.genRiversDefault(riverFieldCount);
         } else {
             // TODO: complex river generation
-            //this.genRiversComplex(riverFieldCount);
+            this.genRiversComplex(riverFieldCount);
         }
     }
 
@@ -226,25 +236,102 @@ class BoardGenerator {
      * @param riverCount
      * @private
      */
-    /*private genRiversComplex(riverCount: number) {
+    private genRiversComplex(riverCount: number) {
+        let done = false;
+        let made = 0;
+        while (!done) {
+            const toMake = this.getRandomInt(2, Math.min(this._startValues.height, this._startValues.width));
+            let startPosition = this.getRandomPosition();
+            let startDirection = this.getRandomDirection();
 
-        throw new Error("method not implemented")
-    }*/
+            this._board[startPosition.y][startPosition.x] = new River(startPosition, startDirection);
+            this._json.addRiverField(startPosition, startDirection);
 
-    /*
-    private getLongestFreeWay() {
+            for (let i = 1; i < toMake; i++) {
+                const neighbors = this.getRiverNeighbors(startPosition);
+                if (neighbors.length > 0) {
+                    let selected: { position: BoardPosition, direction: Direction } = null;
+                    const helpDirection = this.dirEnumToString(startDirection);
+                    for (const neighborsKey in neighbors) {
+                        const {direction} = neighbors[neighborsKey];
+                        if (direction == helpDirection) {
+                            selected = neighbors[neighborsKey];
+                            break;
+                        }
+                    }
+                    if (selected == null) {
+                        break;
+                    } else {
+                        startDirection = this.getRandomDirection();
+                        if (this.dirEnumToString(startDirection) == "SOUTH" && helpDirection == "NORTH" || this.dirEnumToString(startDirection) == "NORTH" && helpDirection == "SOUTH") {
+                            startDirection = BoardGenerator.probably(50) ? DirectionEnum.EAST : DirectionEnum.WEST;
+                        }
+                        if (this.dirEnumToString(startDirection) == "EAST" && helpDirection == "WEST" || this.dirEnumToString(startDirection) == "WEST" && helpDirection == "EAST") {
+                            startDirection = BoardGenerator.probably(50) ? DirectionEnum.NORTH : DirectionEnum.SOUTH;
+                        }
+                        startPosition = selected.position;
+                        this._board[startPosition.y][startPosition.x] = new River(startPosition, startDirection);
+                        this._json.addRiverField(startPosition, startDirection);
+                        made++;
+                        if (made >= riverCount) {
+                            break;
+                        }
+                        continue;
+                    }
+                }
+                break;
+            }
+            if (made >= riverCount) {
+                done = true;
+            }
+
+        }
     }
-    */
+
+    public dirEnumToString(direction: DirectionEnum): Direction {
+        return DirectionEnum[direction] as Direction;
+    }
+
+    public getRiverNeighbors(position: BoardPosition): Array<{ position: BoardPosition, direction: Direction }> {
+        const {x, y} = position;
+
+        const neighbors = new Array<{ position: BoardPosition, direction: Direction }>();
+        //north
+        let currentPosition = {x: x, y: y - 1};
+        if (this.isPositionInBoard(currentPosition) && !(this._board[y][x] instanceof River)) {
+            neighbors.push({position: currentPosition, direction: "NORTH"});
+        }
+
+        //east
+        currentPosition = {x: x + 1, y: y};
+        if (this.isPositionInBoard(currentPosition) && (this._board[y][x] instanceof River)) {
+            neighbors.push({position: currentPosition, direction: "EAST"});
+        }
+        //south
+        currentPosition = {x: x, y: y + 1};
+        if (this.isPositionInBoard(currentPosition) && (this._board[y][x] instanceof River)) {
+            neighbors.push({position: currentPosition, direction: "SOUTH"});
+        }
+
+        //west
+        currentPosition = {x: x - 1, y: y};
+        if (this.isPositionInBoard(currentPosition) && (this._board[y][x] instanceof River)) {
+            neighbors.push({position: currentPosition, direction: "WEST"});
+        }
+
+        return neighbors;
+    }
 
     private genWalls() {
-        const max = Math.floor(Math.sqrt(this.getFieldCount()));
-        const wallsToSet = this.getRandomIntInclusive(1, max);
-        // console.log("MAX WALLS", max, "TO BE SET", wallsToSet);
-        const alreadyTried: Array<string> = []
         const x = this._startValues.width;
         const y = this._startValues.height;
+        const max = (((x - 1) * y) + ((y - 1) * x)) / 4;
+        const wallsToSet = this.getRandomIntInclusive(1, max);
+        //console.log("MAX WALLS", max, "TO BE SET", wallsToSet);
+        const alreadyTried: Array<string> = []
+
         this._wallMaxCall = (((x - 1) * y) + ((y - 1) * x)) * 4;
-        this._wallMaxCall = this._wallMaxCall > 265 ? 265 : this._wallMaxCall
+        this._wallMaxCall = this._wallMaxCall > 1024 ? 1024 : this._wallMaxCall;
         this._wallCall = 0;
         if (wallsToSet)
             this.genWall(wallsToSet, 0, alreadyTried);
@@ -253,24 +340,25 @@ class BoardGenerator {
 
     private genWall(until: number, current: number, alreadyTried: Array<string>) {
         if (this._wallCall < this._wallMaxCall) {
+
             this._wallCall++;
             const firstPosition = this.getRandomPosition(true);
             const neighbors = this.getNeighbors(firstPosition);
             if (neighbors.length) {
                 const secondPosition = neighbors[this.getRandomInt(0, neighbors.length)]
-                // console.log(" > WALL TRY ", firstPosition, secondPosition);
-                if (alreadyTried.indexOf(firstPosition.x.toString() + firstPosition.y.toString() + secondPosition.x.toString() + secondPosition.y) === -1 || alreadyTried.indexOf(secondPosition.x.toString() + secondPosition.y.toString() + firstPosition.x.toString() + firstPosition.y) === -1) {
-                    const wallsCopy = this._walls;
+                //console.log(" > WALL TRY ", firstPosition, secondPosition, "\r");
+                if (!alreadyTried.includes(firstPosition.x.toString() + firstPosition.y.toString() + secondPosition.x.toString() + secondPosition.y) && !alreadyTried.includes(secondPosition.x.toString() + secondPosition.y.toString() + firstPosition.x.toString() + firstPosition.y)) {
+                    const wallsCopy = [...this._walls];
                     this._walls.push([[firstPosition.x, firstPosition.y], [secondPosition.x, secondPosition.y]])
-                    const pathFinder = new PathFinder(this._board, this._walls, this._startValues.width, this._startValues.height, this._checkpoints, this._startFields)
+                    const pathPossible = AStar.pathPossible(this._checkpoints, this._startFields, this._board, this._walls);
 
                     alreadyTried.push(firstPosition.x.toString() + firstPosition.y.toString() + secondPosition.x.toString() + secondPosition.y);
                     alreadyTried.push(secondPosition.x.toString() + secondPosition.y.toString() + firstPosition.x.toString() + firstPosition.y);
-                    // console.log(alreadyTried);
-                    if (pathFinder.check()) {
+                    //console.log(alreadyTried);
+                    if (pathPossible) {
                         current++;
                         this._json.addWall([[firstPosition.x, firstPosition.y], [secondPosition.x, secondPosition.y]]);
-                        // console.log(" > New Wall", [[firstPosition.x, firstPosition.y], [secondPosition.x, secondPosition.y]]);
+                        //console.log(" > New Wall", [[firstPosition.x, firstPosition.y], [secondPosition.x, secondPosition.y]], "\r");
                         if (current < until) {
                             this.genWall(until, current, alreadyTried);
                         }
@@ -289,6 +377,7 @@ class BoardGenerator {
         }
     }
 
+
     public getNeighbors(position: BoardPosition): Array<BoardPosition> {
         const {x, y} = position;
 
@@ -296,31 +385,83 @@ class BoardGenerator {
         //north
         let currentPosition = {x: x, y: y - 1};
         if (this.isPositionInBoard(currentPosition)) {
-            const northField = this._board[y - 1][x];
             neighbors.push(currentPosition);
         }
 
         //east
         currentPosition = {x: x + 1, y: y};
         if (this.isPositionInBoard(currentPosition)) {
-            const eastField = this._board[y][x + 1];
             neighbors.push(currentPosition);
         }
         //south
         currentPosition = {x: x, y: y + 1};
         if (this.isPositionInBoard(currentPosition)) {
-            const southField = this._board[y + 1][x];
-
             neighbors.push(currentPosition);
         }
 
         //west
         currentPosition = {x: x - 1, y: y};
         if (this.isPositionInBoard(currentPosition)) {
-            const westField = this._board[y][x - 1];
             neighbors.push(currentPosition);
         }
 
+        return neighbors;
+    }
+
+    private genWalls_David(): void {
+        for (let y = 0; y < this._board.length; y++) {
+            const row = this._board[y];
+            for (let x = 0; x < row.length; x++) {
+                const field = row[x];
+                this.genWall_David(field.position);
+
+            }
+        }
+    }
+
+    private genWall_David(position: BoardPosition): void {
+
+        const neighbors = this.getNeighbors_David(position);
+        //console.log("CURRENT FIELD", position, "NEIGHBORS", neighbors)
+        for (const neighborsKey in neighbors) {
+            if (BoardGenerator.probably(20)) {
+                const neighbor = neighbors[neighborsKey];
+                const wallsCopy = [...this._walls];
+                this._walls.push([[position.x, position.y], [neighbor.x, neighbor.y]])
+                const pathPossible = AStar.pathPossible(this._checkpoints, this._startFields, this._board, this._walls);
+                if (!pathPossible) {
+                    // console.log(" > WALL ERROR", position, neighbor);
+                    this._walls = wallsCopy;
+                } else {
+                    //console.log(" > NEW WALL", position, neighbor);
+                    this._json.addWall([[position.x, position.y], [neighbor.x, neighbor.y]]);
+                }
+            }
+        }
+
+
+    }
+
+    public static probably(percentage: number): boolean {
+        const zeroToOne = Math.random(); // greater than or equal to 0.0 and less than 1.0
+        const multiple = zeroToOne * 100; // greater than or equal to 0.0 and less than 100.0
+        return multiple < percentage;
+    }
+
+    private getNeighbors_David(position: BoardPosition): Array<BoardPosition> {
+        const {x, y} = position;
+
+        const neighbors = new Array<BoardPosition>();
+        //east
+        let currentPosition = {x: x + 1, y: y};
+        if (this.isPositionInBoard(currentPosition)) {
+            neighbors.push(currentPosition);
+        }
+        //south
+        currentPosition = {x: x, y: y + 1};
+        if (this.isPositionInBoard(currentPosition)) {
+            neighbors.push(currentPosition);
+        }
         return neighbors;
     }
 
@@ -329,10 +470,8 @@ class BoardGenerator {
         if (x > (this._startValues.width - 1) || x < 0) {
             return false;
         }
-        if (y > (this._startValues.height - 1) || y < 0) {
-            return false;
-        }
-        return true;
+        return !(y > (this._startValues.height - 1) || y < 0);
+
     }
 
 
@@ -394,7 +533,7 @@ class BoardGenerator {
         return this._board;
     }
 
-    get json(): JSON {
+    get json(): BoardConfigInterface {
         return JSON.parse(JSON.stringify(this._json));
     }
 

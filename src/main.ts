@@ -1,30 +1,26 @@
 import Board from "./generator/board";
-import BoardGenerator, {RandomBoardInterface} from "./generator/boardGenerator";
-import * as fs from "fs";
+import {RandomBoardInterface} from "./generator/boardGenerator";
+import Viewer from "./viewer/Viewer";
 
 const _startValues: RandomBoardInterface = {
-    checkpoints: 1,
-    height: 4,
-    lembasFields: 1,
+    checkpoints: 2,
+    height: 9,
+    lembasFields: 5,
     maxLembasAmountOnField: 3,
-    lembasAmountExactMaximum: true,
+    lembasAmountExactMaximum: false,
     rivers: true,
-    startFields: 2,
-    width: 4,
-    holes: 2,
+    startFields: 6,
+    width: 16,
+    holes: 8,
     walls: true,
-    riverAlgorithm: "default"
+    riverAlgorithm: "complex"
 };
 
-const {board, json} = Board.generateRandom(_startValues);
+const generator = Board.generateRandom(_startValues, null, true);
+const viewer = new Viewer(generator);
+viewer.draw("board-david");
 
-console.log(BoardGenerator.printRandomGeneratorBoard(board));
-
-fs.writeFile("dist/board.json", JSON.stringify(json, null, 4), (err) => {
-    if (err)
-        console.log(err);
-    else {
-        console.log(fs.readFileSync("dist/board.json", "utf8"));
-        fs.rmSync("dist/board.json");
-    }
-})
+const generator_ = Board.generateRandom({..._startValues, riverAlgorithm: "default"});
+const viewer_ = new Viewer(generator_);
+viewer_.draw("board-nick");
+process.stdout.write("\x07");

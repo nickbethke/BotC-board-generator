@@ -213,8 +213,7 @@ class BoardGenerator {
     private genRivers() {
 
         const freeSpacesCount = this.getFreeFieldsCount();
-        const max = Math.floor(freeSpacesCount / 4);
-        let riverFieldCount = max <= 1 ? 1 : this.getRandomIntInclusive(1, max);
+        let riverFieldCount = Math.floor(freeSpacesCount / 5);
 
         // on max=1, riverFieldCount could be bigger than 1
         if (riverFieldCount > freeSpacesCount) {
@@ -344,57 +343,45 @@ class BoardGenerator {
         const alreadyTried: Array<string> = []
 
         this._wallMaxCall = (((x - 1) * y) + ((y - 1) * x)) * 4;
-        this._wallMaxCall = this._wallMaxCall > 1024 ? 1024 : this._wallMaxCall;
         this._wallCall = 0;
-        if (wallsToSet)
-            this.genWall(wallsToSet, 0, alreadyTried, 0);
-    }
-
-    private genWall(until: number, current: number, alreadyTried: Array<string>, pathFindings = 0) {
-        if (this._wallCall < this._wallMaxCall) {
-            this._wallCall++;
-            const firstPosition = this.getRandomPosition(true);
-            const neighbors = this.getNeighbors(firstPosition);
-            if (neighbors.length) {
-                const secondPosition = neighbors[this.getRandomInt(0, neighbors.length)]
-                process.stdout.write("\t\t WALL:TRY " + (current + 1) + `/` + until + " (PATHFINDINGS: " + pathFindings + ")" + `\r`);
-                if (!alreadyTried.includes(firstPosition.x.toString() + firstPosition.y.toString() + secondPosition.x.toString() + secondPosition.y) && !alreadyTried.includes(secondPosition.x.toString() + secondPosition.y.toString() + firstPosition.x.toString() + firstPosition.y)) {
-                    const wallsCopy = [...this._walls];
-                    this._walls.push([[firstPosition.x, firstPosition.y], [secondPosition.x, secondPosition.y]])
-                    const {
-                        result,
-                        pathFindings: p
-                    } = AStar.pathPossible(this._checkpoints, this._startFields, this._board, this._walls);
-                    pathFindings += p;
-
-                    alreadyTried.push(firstPosition.x.toString() + firstPosition.y.toString() + secondPosition.x.toString() + secondPosition.y);
-                    alreadyTried.push(secondPosition.x.toString() + secondPosition.y.toString() + firstPosition.x.toString() + firstPosition.y);
-                    //console.log(alreadyTried);
-                    if (result) {
-                        current++;
-                        this._json.addWall([[firstPosition.x, firstPosition.y], [secondPosition.x, secondPosition.y]]);
-                        //console.log(" > New Wall", [[firstPosition.x, firstPosition.y], [secondPosition.x, secondPosition.y]], "\r");
-                        if (current < until) {
-                            this.genWall(until, current, alreadyTried, pathFindings);
-                        }
-
-                    } else {
-                        this._walls = wallsCopy;
-                        // console.log(" > ERROR Wall");
-                        if (current < until) {
-                            this.genWall(until, current, alreadyTried, pathFindings);
-                        }
-                    }
-                } else if (current < until) {
-                    this.genWall(until, current, alreadyTried, pathFindings);
-                }
-
+        let pathFindings = 0;
+        if (wallsToSet) {
+            while (this._wallCall < this._wallMaxCall && this._walls.length < wallsToSet) {
+                process.stdout.write("\t\t WALL:RUN " + this._walls.length + `/` + wallsToSet + " WALLS (PATHFINDINGS: " + pathFindings + ")" + `\r`);
+                pathFindings += this.genWall(alreadyTried);
+                this._wallCall++;
             }
+            process.stdout.write("\t\t WALL:TRY " + this._walls.length + `/` + wallsToSet + " WALLS (PATHFINDINGS: " + pathFindings + ")" + `\n`);
         }
-        if (current == until)
-            process.stdout.write("\t\t WALL:TRY " + until + `/` + until + " (PATHFINDINGS: " + pathFindings + ")" + `\n`);
+
     }
 
+    private genWall(alreadyTried: Array<string>): number {
+        let pathFindings = 0;
+        const firstPosition = this.getRandomPosition(true);
+        const neighbors = this.getNeighbors(firstPosition);
+        if (neighbors.length) {
+            const secondPosition = neighbors[this.getRandomInt(0, neighbors.length)]
+            if (!alreadyTried.includes(firstPosition.x.toString() + firstPosition.y.toString() + secondPosition.x.toString() + secondPosition.y) && !alreadyTried.includes(secondPosition.x.toString() + secondPosition.y.toString() + firstPosition.x.toString() + firstPosition.y)) {
+                const wallsCopy = [...this._walls];
+                this._walls.push([[firstPosition.x, firstPosition.y], [secondPosition.x, secondPosition.y]])
+                const {
+                    result,
+                    pathFindings: p
+                } = AStar.pathPossible(this._checkpoints, this._startFields, this._board, this._walls);
+                pathFindings += p;
+                alreadyTried.push(firstPosition.x.toString() + firstPosition.y.toString() + secondPosition.x.toString() + secondPosition.y);
+                alreadyTried.push(secondPosition.x.toString() + secondPosition.y.toString() + firstPosition.x.toString() + firstPosition.y);
+                if (result) {
+                    this._json.addWall([[firstPosition.x, firstPosition.y], [secondPosition.x, secondPosition.y]]);
+                } else {
+                    this._walls = wallsCopy;
+                }
+            }
+
+        }
+        return pathFindings;
+    }
 
     public getNeighbors(position: BoardPosition): Array<BoardPosition> {
         const {x, y} = position;
@@ -433,13 +420,13 @@ class BoardGenerator {
             const row = this._board[y];
             for (let x = 0; x < row.length; x++) {
                 const field = row[x];
-                process.stdout.write("\t\t WALL:RUN " + (runs + 1) + `/` + this.getFieldCount() + " (PATHFINDINGS: " + pathFindings + ")" + `\r`);
+                process.stdout.write("\t\t WALL:RUN " + (runs + 1) + `/` + this.getFieldCount() + " RUNS (PATHFINDINGS: " + pathFindings + ")" + `\r`);
                 pathFindings = this.genWall_David(field.position, pathFindings);
                 runs++;
 
             }
         }
-        process.stdout.write("\t\t WALL:RUN " + this.getFieldCount() + `/` + this.getFieldCount() + " (PATHFINDINGS: " + pathFindings + ")" + `\n`);
+        process.stdout.write("\t\t WALL:RUN " + this.getFieldCount() + `/` + this.getFieldCount() + " RUNS (PATHFINDINGS: " + pathFindings + ")" + `\n`);
     }
 
     private genWall_David(position: BoardPosition, pathFindings: number): number {

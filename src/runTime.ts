@@ -1,10 +1,10 @@
 import Board from "./generator/board";
 import {RandomBoardInterface} from "./generator/boardGenerator";
 
-global.process.stdout.write = (buffer) => {
-    return true
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+global.process.stdout.write = (buffer): boolean => {
+    return buffer;
 };
-
 
 function mine(_startValues: RandomBoardInterface, runs: number, type: string) {
     let timeSumSmall = 0;
@@ -81,10 +81,10 @@ const _startValuesSmall: RandomBoardInterface = {
 mine(_startValuesSmall, runsSmall, "small");
 davids(_startValuesSmall, runsSmall, "small");
 
-const runs = 100;
+const runs = 10;
 const _startValues: RandomBoardInterface = {
-    width: 64,
-    height: 64,
+    width: 128,
+    height: 128,
     startFields: 6,
     checkpoints: 6,
     holes: 128,

@@ -17,22 +17,12 @@ class AStar {
     private readonly _board: Array<Array<FieldWithPositionInterface>>;
 
     private readonly _walls: Array<[[number, number], [number, number]]>;
-    private _wallsStrings: string[];
 
     constructor(start: BoardPosition, goal: BoardPosition, board: Array<Array<FieldWithPositionInterface>>, walls: Array<[[number, number], [number, number]]>) {
         this._start = start
         this._goal = goal;
         this._board = board;
         this._walls = walls;
-
-        this._wallsStrings = [];
-
-        for (const wallsKey in this._walls) {
-            const w = this._walls[wallsKey];
-
-            const wallString = w[0].join("") + w[1].join("");
-            this._wallsStrings.push(wallString);
-        }
     }
 
     AStar(): Array<{ state: { x: number, y: number }, cost: number, estimate: number }> {
@@ -172,14 +162,11 @@ class AStar {
         const _y1 = position1.y;
         const _y2 = position2.y;
 
-        const positionString1 = _x1.toString() + _y1.toString() + _x2.toString() + _y2.toString()
-        const positionString2 = _x2.toString() + _y2.toString() + _x1.toString() + _y1.toString()
-
-        if (this._wallsStrings.includes(positionString1)) {
-            return true;
-        } else if (this._wallsStrings.includes(positionString2)) {
+        const right = this._walls.includes([[_x1, _y1], [_x2, _y2]]);
+        if (right) {
             return true;
         }
+        return this._walls.includes([[_x2, _y2], [_x1, _y1]]);
     }
 
     pathIntersectsObstacle(start: BoardPosition, end: BoardPosition) {

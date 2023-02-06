@@ -1,8 +1,7 @@
 import BoardConfigInterface, {Direction, Position} from "../interfaces/boardConfigInterface";
 import {CanvasRenderingContext2D, createCanvas, loadImage} from "canvas";
 import * as fs from "fs";
-import {RandomBoardInterface} from "../generator/boardGenerator";
-import BoardGenerator from "../generator/boardGenerator";
+import BoardGenerator, {RandomBoardInterface} from "../generator/boardGenerator";
 
 class Viewer {
     private readonly _json: BoardConfigInterface;

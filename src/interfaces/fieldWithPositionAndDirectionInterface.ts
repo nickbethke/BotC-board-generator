@@ -1,4 +1,3 @@
-import {BoardPosition} from "../generator/boardGenerator";
 import {DirectionEnum} from "./boardConfigInterface";
 import FieldWithPositionInterface from "./fieldWithPositionInterface";
 

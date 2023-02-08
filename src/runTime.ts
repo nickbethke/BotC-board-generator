@@ -19,7 +19,7 @@ function mine(_startValues: RandomBoardInterface, runs: number, type: string) {
             const end = Date.now();
             timeSumSmall += end - start;
         }, false);
-        wallsSmall += generator.walls.length;
+        wallsSmall += generator.wallCount();
     }
     process.stderr.write("\n|---------------------------\n");
     process.stderr.write("| > NICKs ALGO: " + "\n");
@@ -47,7 +47,7 @@ function davids(_startValues: RandomBoardInterface, runs: number, type: string) 
             const end = Date.now();
             timeSumSmall += end - start;
         }, true);
-        wallsSmall += generator.walls.length;
+        wallsSmall += generator.wallCount();
     }
     process.stderr.write("\n|---------------------------" + "\n");
     process.stderr.write("| > DAVIDs ALGO: " + "\n");

@@ -147,7 +147,15 @@ describe("a-star", () => {
             {x: 0, y: 1},
             {x: 2, y: 0}
         ]
-        const {result} = AStar.pathPossible(checkpoints, startFields, board, walls);
+        const map: Map<string, boolean> = new Map();
+        for (let i = 0; i < walls.length; i++) {
+            const wall = walls[i];
+            const _s1 = wall[0][0].toString() + wall[0][1].toString() + wall[1][0].toString() + wall[1][1].toString()
+            const _s2 = wall[1][0].toString() + wall[1][1].toString() + wall[0][0].toString() + wall[0][1].toString()
+            map.set(_s1, true);
+            map.set(_s2, true);
+        }
+        const {result} = AStar.pathPossible(checkpoints, startFields, [], board, map);
         expect(result).toBe(true);
     });
     test("a-star algorithm", () => {
@@ -169,7 +177,6 @@ describe("a-star", () => {
             ]
         ]
 
-        const walls: Array<[[number, number], [number, number]]> = []
         const checkpoints = [
             {x: 1, y: 1},
             {x: 1, y: 2}
@@ -178,7 +185,7 @@ describe("a-star", () => {
             {x: 0, y: 1},
             {x: 2, y: 0}
         ]
-        const {result} = AStar.pathPossible(checkpoints, startFields, board, walls);
+        const {result} = AStar.pathPossible(checkpoints, startFields, [], board, new Map([]));
         expect(result).toBe(true);
 
     })
@@ -201,9 +208,9 @@ describe("wall generation", () => {
         };
 
         const generator = Board.generateRandom(startValuesSmall, null, false);
-        expect(generator.walls.length).toBeGreaterThanOrEqual(0)
+        expect(generator.wallCount()).toBeGreaterThanOrEqual(0)
         const generatorD = Board.generateRandom(startValuesSmall, null, true);
-        expect(generatorD.walls.length).toBeGreaterThanOrEqual(0)
+        expect(generatorD.wallCount()).toBeGreaterThanOrEqual(0)
     })
 })
 

@@ -57,12 +57,16 @@ class BoardGenerator {
     private readonly _board: Array<Array<FieldWithPositionInterface>>;
     private readonly _startValues: RandomBoardInterface;
     private readonly _json: Board;
-    private _walls: Array<[[number, number], [number, number]]>;
+    private _walls = 0;
+    private _wallMapArray: Array<[string, boolean]>;
 
     private readonly _checkpoints: BoardPosition[]
     private readonly _startFields: BoardPosition[]
     private _wallCall: number;
     private _wallMaxCall: number;
+    private _holesSet: number;
+    private _holesTrys: Map<string, boolean>;
+    private readonly _lembasFields: BoardPosition[];
 
     /**
      * @throws {Error}
@@ -78,6 +82,8 @@ class BoardGenerator {
 
         this._checkpoints = [];
         this._startFields = [];
+        this._lembasFields = [];
+        this._wallMapArray = [];
 
 
         if (this.getFieldCount() < this.getOccupiedFieldsCount()) {
@@ -85,51 +91,57 @@ class BoardGenerator {
         }
 
         process.stdout.write(`\tGENERATING:BOARD_ARRAY\r`);
+        let start = Date.now();
         this._board = this.generateBoardArray();
-        process.stdout.write(`\tGENERATING:BOARD_ARRAY ✔️\n`);
-        this._walls = [];
+        process.stdout.write(`\tGENERATING:BOARD_ARRAY ✔️ ` + (Date.now() - start) + ` ms\n`);
 
         this._json = new Board(this._startValues.name, this._startValues.width, this._startValues.height);
 
-        if (this._startValues.rivers && this.getFreeFieldsCount()) {
-            process.stdout.write(`\tGENERATING:RIVERS\r`);
-            this.genRivers();
-            process.stdout.write(`\tGENERATING:RIVERS ✔️\n`);
-        }
-
         process.stdout.write(`\tGENERATING:SAURONS_EYE\r`)
+        start = Date.now();
         this.genSauronsEye();
-        process.stdout.write(`\tGENERATING:SAURONS_EYE ✔️\n`);
+        process.stdout.write(`\tGENERATING:SAURONS_EYE ✔️ ` + (Date.now() - start) + ` ms\n`);
 
-        process.stdout.write(`\tGENERATING:START_FIELDS\r`)
+        process.stdout.write(`\tGENERATING:START_FIELDS\n`)
+        start = Date.now();
         this.genStartFields();
-        process.stdout.write(`\tGENERATING:START_FIELDS ✔️\n`);
+        process.stdout.write(`\tGENERATING:START_FIELDS ✔️ ` + (Date.now() - start) + ` ms\n`);
 
         process.stdout.write(`\tGENERATING:CHECKPOINTS\r`)
+        start = Date.now();
         this.genCheckpoints();
-        process.stdout.write(`\tGENERATING:CHECKPOINTS ✔️\n`);
-
-        if (this._startValues.holes) {
-            process.stdout.write(`\tGENERATING:HOLES\r`)
-            this.genHoles();
-            process.stdout.write(`\tGENERATING:HOLES ✔️\n`);
-        }
+        process.stdout.write(`\tGENERATING:CHECKPOINTS ✔️ ` + (Date.now() - start) + ` ms\n`);
 
         if (this._startValues.lembasFields) {
             process.stdout.write(`\tGENERATING:LEMBAS_FIELDS\r`)
+            start = Date.now();
             this.genLembasFields();
-            process.stdout.write(`\tGENERATING:LEMBAS_FIELDS ✔️\n`);
+            process.stdout.write(`\tGENERATING:LEMBAS_FIELDS ✔️ ` + (Date.now() - start) + ` ms\n`);
         }
 
+        if (this._startValues.holes) {
+            process.stdout.write(`\tGENERATING:HOLES\n`)
+            start = Date.now();
+            this.genHoles();
+            process.stdout.write(`\tGENERATING:HOLES ✔️ ` + (Date.now() - start) + ` ms\n`);
+        }
+
+        if (this._startValues.rivers && this.getFreeFieldsCount()) {
+            process.stdout.write(`\tGENERATING:RIVERS\r`);
+            start = Date.now();
+            this.genRivers();
+            process.stdout.write(`\tGENERATING:RIVERS ✔️ ` + (Date.now() - start) + ` ms\n`);
+        }
 
         if (this._startValues.walls) {
             process.stdout.write(`\tGENERATING:WALLS\n`)
+            start = Date.now();
             if (wallAlgo) {
                 this.genWalls_David();
             } else {
                 this.genWalls();
             }
-            process.stdout.write(`\tGENERATING:WALLS ✔️\n`);
+            process.stdout.write(`\tGENERATING:WALLS ✔️ ` + (Date.now() - start) + ` ms\n`);
 
         }
         process.stdout.write(`\tGENERATING:DONE ✔️\n`);
@@ -158,9 +170,12 @@ class BoardGenerator {
     }
 
     private genStartFields() {
-        for (let i = 0; i < this._startValues.startFields; i++) {
+        const todo = this._startValues.startFields;
+        for (let i = 0; i < todo; i++) {
             this.genStartField();
+            process.stdout.write("\t\t STARTFIELD " + i + "/" + todo + `\r`);
         }
+        process.stdout.write("\t\t STARTFIELD " + todo + "/" + todo + `\n`);
     }
 
     private genStartField() {
@@ -185,16 +200,30 @@ class BoardGenerator {
     }
 
     private genHoles() {
-        for (let i = 0; i < this._startValues.holes; i++) {
+        const maxTrys = this.getFieldCount() * 8;
+        let trys = 0;
+        this._holesSet = 0;
+        this._holesTrys = new Map;
+        while (this._holesSet < this._startValues.holes && trys < maxTrys) {
+            process.stdout.write("\t\t HOLES: " + this._holesSet + " TRY " + trys + "/" + maxTrys + "\r");
             this.genHole();
+            trys++;
         }
+        process.stdout.write("\t\t HOLES: " + this._holesSet + " TRY " + trys + "/" + maxTrys + "\n");
 
     }
 
     private genHole() {
         const position = this.getRandomPosition();
-        this._board[position.y][position.x] = new Hole(position);
-        this._json.addHole(position);
+        if (this._holesTrys.get(this.position2String(position)) == undefined) {
+            const {result} = AStar.pathPossible(this._checkpoints, this._startFields, this._lembasFields, this._board, new Map([]));
+            if (result) {
+                this._board[position.y][position.x] = new Hole(position);
+                this._json.addHole(position);
+                this._holesSet++;
+            }
+            this._holesTrys.set(this.position2String(position), true);
+        }
     }
 
     private genLembasFields() {
@@ -207,6 +236,7 @@ class BoardGenerator {
         const position = this.getRandomPosition();
         const amount = this._startValues.lembasAmountExactMaximum ? this._startValues.maxLembasAmountOnField : this.getRandomLembasAmount();
         this._board[position.y][position.x] = new Lembas(position, amount);
+        this._lembasFields.push(position);
         this._json.addLembasField(position, amount);
     }
 
@@ -223,7 +253,7 @@ class BoardGenerator {
         if (this._startValues.riverAlgorithm == "default") {
             this.genRiversDefault(riverFieldCount);
         } else {
-            // TODO: complex river generation
+            // DONE: complex river generation
             this.genRiversComplex(riverFieldCount);
         }
     }
@@ -333,49 +363,69 @@ class BoardGenerator {
         return neighbors;
     }
 
-    private genWalls() {
+    private msToTime(duration) {
+        const milliseconds = Math.floor((duration % 1000) / 100)
+        let seconds: string | number = Math.floor((duration / 1000) % 60),
+            minutes: string | number = Math.floor((duration / (1000 * 60)) % 60),
+            hours: string | number = Math.floor((duration / (1000 * 60 * 60)) % 24);
+
+        hours = (hours < 10) ? "0" + hours : hours;
+        minutes = (minutes < 10) ? "0" + minutes : minutes;
+        seconds = (seconds < 10) ? "0" + seconds : seconds;
+
+        return hours + ":" + minutes + ":" + seconds + "." + milliseconds;
+    }
+
+    private async genWalls() {
         const x = this._startValues.width;
         const y = this._startValues.height;
-        //const max = (((x - 1) * y) + ((y - 1) * x)) / 4;
-        //const wallsToSet = this.getRandomIntInclusive(1, max);
         const wallsToSet = Math.floor((((x - 1) * y) + ((y - 1) * x)) * this._percentage);
-        //console.log("MAX WALLS", max, "TO BE SET", wallsToSet);
         const alreadyTried: Array<string> = []
 
         this._wallMaxCall = (((x - 1) * y) + ((y - 1) * x)) * 4;
         this._wallCall = 0;
         let pathFindings = 0;
         if (wallsToSet) {
-            while (this._wallCall < this._wallMaxCall && this._walls.length < wallsToSet) {
-                process.stdout.write("\t\t WALL:RUN " + this._walls.length + `/` + wallsToSet + " WALLS (PATHFINDINGS: " + pathFindings + ")" + `\r`);
+            let absTime = 0;
+            let time = 0;
+            while (this._wallCall < this._wallMaxCall && this._walls < wallsToSet) {
+                process.stdout.write("\t\t WALL:RUN " + this._walls + `/` + wallsToSet + " WALLS (PATHFINDINGS: " + pathFindings + ") ~ " + this.msToTime(absTime) + `/` + this.msToTime(time * wallsToSet) + `         \r`);
+                const start = Date.now();
                 pathFindings += this.genWall(alreadyTried);
+                time = Date.now() - start
+                absTime += time;
                 this._wallCall++;
             }
-            process.stdout.write("\t\t WALL:TRY " + this._walls.length + `/` + wallsToSet + " WALLS (PATHFINDINGS: " + pathFindings + ")" + `\n`);
+            process.stdout.write("\t\t WALL:TRY " + this._walls + `/` + wallsToSet + " WALLS (PATHFINDINGS: " + pathFindings + ")" + `\n`);
         }
 
     }
 
     private genWall(alreadyTried: Array<string>): number {
+
         let pathFindings = 0;
         const firstPosition = this.getRandomPosition(true);
         const neighbors = this.getNeighbors(firstPosition);
         if (neighbors.length) {
             const secondPosition = neighbors[this.getRandomInt(0, neighbors.length)]
             if (!alreadyTried.includes(firstPosition.x.toString() + firstPosition.y.toString() + secondPosition.x.toString() + secondPosition.y) && !alreadyTried.includes(secondPosition.x.toString() + secondPosition.y.toString() + firstPosition.x.toString() + firstPosition.y)) {
-                const wallsCopy = [...this._walls];
-                this._walls.push([[firstPosition.x, firstPosition.y], [secondPosition.x, secondPosition.y]])
+                const _s1 = this.position2String(firstPosition) + this.position2String(secondPosition);
+                const _s2 = this.position2String(secondPosition) + this.position2String(firstPosition);
+                const wallsArrayCopy = [...this._wallMapArray];
+                this._wallMapArray.push([_s1, true], [_s2, true]);
                 const {
-                    result,
-                    pathFindings: p
-                } = AStar.pathPossible(this._checkpoints, this._startFields, this._board, this._walls);
+                        result,
+                        pathFindings: p
+                    } = AStar.pathPossible(this._checkpoints, this._startFields, this._lembasFields, this._board, new Map(this._wallMapArray)
+                    )
+                ;
                 pathFindings += p;
-                alreadyTried.push(firstPosition.x.toString() + firstPosition.y.toString() + secondPosition.x.toString() + secondPosition.y);
-                alreadyTried.push(secondPosition.x.toString() + secondPosition.y.toString() + firstPosition.x.toString() + firstPosition.y);
+                alreadyTried.push(_s1, _s2);
                 if (result) {
+                    this._walls++;
                     this._json.addWall([[firstPosition.x, firstPosition.y], [secondPosition.x, secondPosition.y]]);
                 } else {
-                    this._walls = wallsCopy;
+                    this._wallMapArray = wallsArrayCopy;
                 }
             }
 
@@ -416,38 +466,43 @@ class BoardGenerator {
     private genWalls_David(): void {
         let runs = 0;
         let pathFindings = 0;
+        const fieldCount = this.getFieldCount();
+        let absTime = 0;
         for (let y = 0; y < this._board.length; y++) {
             const row = this._board[y];
             for (let x = 0; x < row.length; x++) {
                 const field = row[x];
-                process.stdout.write("\t\t WALL:RUN " + (runs + 1) + `/` + this.getFieldCount() + " RUNS (PATHFINDINGS: " + pathFindings + ")" + `\r`);
+                const start = Date.now();
+                process.stdout.write("\t\t WALL:RUN " + (runs + 1) + `/` + fieldCount + " WALLS (PATHFINDINGS: " + pathFindings + ") ~ " + this.msToTime(absTime) + `/` + this.msToTime((absTime / (runs + 1)) * fieldCount) + `         \r`);
                 pathFindings = this.genWall_David(field.position, pathFindings);
+                absTime += Date.now() - start;
                 runs++;
 
             }
         }
-        process.stdout.write("\t\t WALL:RUN " + this.getFieldCount() + `/` + this.getFieldCount() + " RUNS (PATHFINDINGS: " + pathFindings + ")" + `\n`);
+        process.stdout.write("\t\t WALL:RUN " + fieldCount + `/` + fieldCount + " RUNS (PATHFINDINGS: " + pathFindings + ")" + `\n`);
     }
 
     private genWall_David(position: BoardPosition, pathFindings: number): number {
 
         const neighbors = this.getNeighbors_David(position);
-        //console.log("CURRENT FIELD", position, "NEIGHBORS", neighbors)
         for (const neighborsKey in neighbors) {
             if (BoardGenerator.probably((this._percentage * 100))) {
                 const neighbor = neighbors[neighborsKey];
-                const wallsCopy = [...this._walls];
-                this._walls.push([[position.x, position.y], [neighbor.x, neighbor.y]])
+                const _s1 = this.position2String(position) + this.position2String(neighbor);
+                const _s2 = this.position2String(neighbor) + this.position2String(position);
+                const wallsArrayCopy = [...this._wallMapArray];
+                this._wallMapArray.push([_s1, true], [_s2, true]);
                 const {
                     result: pathPossible,
                     pathFindings: p
-                } = AStar.pathPossible(this._checkpoints, this._startFields, this._board, this._walls);
+                } = AStar.pathPossible(this._checkpoints, this._startFields, this._lembasFields, this._board, new Map(this._wallMapArray));
                 pathFindings += p;
                 if (!pathPossible) {
-                    // console.log(" > WALL ERROR", position, neighbor);
-                    this._walls = wallsCopy;
+                    this._wallMapArray = wallsArrayCopy;
                 } else {
-                    //console.log(" > NEW WALL", position, neighbor);
+                    this._walls++;
+                    this._wallMapArray.push([_s1, true], [_s2, true]);
                     this._json.addWall([[position.x, position.y], [neighbor.x, neighbor.y]]);
                 }
             }
@@ -544,6 +599,10 @@ class BoardGenerator {
         return Math.floor(Math.random() * (max - min) + min);
     }
 
+    private position2String(postion: BoardPosition): string {
+        return postion.x.toString() + postion.y.toString();
+    }
+
     get board(): Array<Array<FieldWithPositionInterface>> {
         return this._board;
     }
@@ -556,7 +615,7 @@ class BoardGenerator {
         return this._startValues;
     }
 
-    get walls(): Array<[[number, number], [number, number]]> {
+    public wallCount(): number {
         return this._walls;
     }
 
@@ -586,6 +645,12 @@ class BoardGenerator {
 
     static firstLetter(string: string): string {
         return string.substring(0, 1);
+    }
+
+    static sleep(ms) {
+        return new Promise((resolve) => {
+            setTimeout(resolve, ms);
+        });
     }
 }
 
